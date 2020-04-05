@@ -73,12 +73,12 @@ app.layout = html.Div([
                 value='tab-3', className='custom-tab',
                 selected_className='custom-tab--selected'
             ),
-            # dcc.Tab(
-            #     label='Projections',
-            #     value='tab-4',
-            #     className='custom-tab',
-            #     selected_className='custom-tab--selected'
-            # ),
+            dcc.Tab(
+                label='Projections',
+                value='tab-4',
+                className='custom-tab',
+                selected_className='custom-tab--selected'
+            ),
             dcc.Tab(
                 label='Measures',
                 value='tab-5',
