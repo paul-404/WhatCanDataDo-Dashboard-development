@@ -293,7 +293,11 @@ app.layout = html.Div([
                 selected_className='custom-tab--selected'
             ),
             dcc.Tab(
+<<<<<<< HEAD
                 label='Models',
+=======
+                label='Projections',
+>>>>>>> 0be1f4dcdded5bca3e37c13d5067f122b2ba1ec2
                 value='tab-4',
                 className='custom-tab',
                 selected_className='custom-tab--selected'
