@@ -2,12 +2,11 @@ import dash
 import dash_html_components as html
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
-import dash_daq as daq
 import pandas as pd
 import requests
+import plotly.graph_objects as go
 
 from dash.dependencies import Input, Output
-
 
 ### Launch app
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -15,21 +14,24 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.config.suppress_callback_exceptions = True # suppress callback errors
 server = app.server
-app.title="Dashboard"
+app.title="COVID-19 Live Analytics"
 
-### Import Data from JHU CSSE & rename columns to single word names
-df = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
-df = df.rename(columns={"Country/Region": "Country", "Province/State": "Province"})
+### Import Data from JHU CSSE & create country dataframe
+# Import Data
+df_cases_jhu = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
+df_recovered_jhu = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
+df_deaths_jhu = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
 
-df1 = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
-df1 = df1.rename(columns={"Country/Region": "Country", "Province/State": "Province"})
+# Country Dataframe: Create new dataframes with entries per country (sum over province) & rename columns to single words & drop Lat and Long columns
+df_cases = df_cases_jhu.rename(columns={"Country/Region": "Country", "Province/State": "Province"}).groupby("Country").sum().reset_index().drop(["Lat", "Long"], axis=1)
+df_recovered = df_recovered_jhu.rename(columns={"Country/Region": "Country", "Province/State": "Province"}).groupby("Country").sum().reset_index().drop(["Lat", "Long"], axis=1)
+df_deaths = df_deaths_jhu.rename(columns={"Country/Region": "Country", "Province/State": "Province"}).groupby("Country").sum().reset_index().drop(["Lat", "Long"], axis=1)
 
-### Call APIs for live counts
+
+### Call APIs for live counts world
 live_all = requests.get("https://corona.lmao.ninja/all").json()
 
-### Create Time Series and Country Selection Lists
-time = df.columns[4:]
-#countries_all = df["Country"].unique() # all Countries
+### Create Country Selection Lists
 countries_top10 = ["US", "Italy", "Spain", "China", "Germany", "France", "Iran", "United Kingdom", "Switzerland", "Turkey"]
 countries_top15 = ["US", "Italy", "Spain", "China", "Germany", "France", "Iran", "United Kingdom", "Switzerland", "Turkey", "Belgium", "Netherlands", "Austria", "Korea, South", "Canada"]
 countries_top20 = ["US", "Italy", "Spain", "China", "Germany", "France", "Iran", "United Kingdom", "Switzerland", "Turkey", "Belgium", "Netherlands", "Austria", "Korea, South", "Canada", "Portugal", "Brazil", "Israel", "Norway", "Australia"]
@@ -42,13 +44,230 @@ countries_nomask = ["US", "Italy", "Spain", "Germany", "France", "United Kingdom
 threshold = 100 # Minimum number of cases on first day for trend plots
 
 ### Create Dropdown options
-dropdown_options = [{"label" : i, "value" : i} for i in df["Country"].unique()]
+dropdown_options = [{"label" : i, "value" : i} for i in df_cases["Country"].unique()]
+
+### Create Map figure
+
+#World Map
+fig_world = go.Figure()
+scale = df_cases["4/5/20"].max() # Use max cases in country on "4/5/20" as scaling factor
+fig_world.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_cases['Country'],
+        text = df_cases.iloc[:,-1],
+        marker = dict(
+            size = df_cases.iloc[:,-1]*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'red',
+            opacity = 0.7,
+            ),
+        name='total confirmed'
+        )
+    )
+
+df_recovered_size = df_recovered.iloc[:,-1] + df_deaths.iloc[:,-1] # Add Deaths to recovered size since deaths are displayed on top. This way at the end total confirmed size = total recovered size
+fig_world.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_recovered['Country'],
+        text = df_recovered.iloc[:,-1],
+        marker = dict(
+            size = df_recovered_size*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'green',
+            opacity = 0.7,
+            ),
+        name='total recovered'
+        )
+    )
+
+fig_world.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_deaths['Country'],
+        text = df_deaths.iloc[:,-1],
+        marker = dict(
+            size = df_deaths.iloc[:,-1]*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'yellow',
+            opacity = 0.7,
+            ),
+        name='total deceased'
+        )
+    )
+
+fig_world.update_layout(
+        title = 'World',
+        showlegend = True,
+        legend_orientation="h",
+        legend=dict(x=0.25, y=0),
+        height = 400,
+        margin = {"r":0,"t":50,"l":0,"b":0},
+        geo = dict(
+            scope = 'world',
+            landcolor = 'rgb(217, 217, 217)',
+            showcountries = True,
+            countrycolor = "white",
+            coastlinecolor = "white",
+            showframe = True,
+            #lonaxis_range= [ -150, None ],
+            #lataxis_range= [ -60, 90 ],
+            projection_type = 'natural earth'
+        )
+    )
+
+# Europe Map
+fig_europe = go.Figure()
+
+fig_europe.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_cases['Country'],
+        text = df_cases.iloc[:,-1],
+        marker = dict(
+            size = df_cases.iloc[:,-1]*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'red',
+            opacity = 0.7,
+            ),
+        name='total confirmed'
+        )
+    )
+
+fig_europe.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_recovered['Country'],
+        text = df_recovered.iloc[:,-1],
+        marker = dict(
+            size = df_recovered_size*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'green',
+            opacity = 0.7,
+            ),
+        name='total recovered'
+        )
+    )
+
+fig_europe.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_deaths['Country'],
+        text = df_deaths.iloc[:,-1],
+        marker = dict(
+            size = df_deaths.iloc[:,-1]*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'yellow',
+            opacity = 0.7,
+            ),
+        name='total deceased'
+        )
+    )
+
+fig_europe.update_layout(
+        title = 'Europe',
+        showlegend = True,
+        legend_orientation="h",
+        legend=dict(x=0.25, y=0),
+        height = 400,
+        margin = {"r":0,"t":50,"l":0,"b":0},
+        geo = dict(
+            scope = 'europe',
+            landcolor = 'rgb(217, 217, 217)',
+            showcountries = True,
+            countrycolor = "white",
+            coastlinecolor = "white",
+            showframe = True,
+            #lonaxis_range= [ -150, None ],
+            #lataxis_range= [ -60, 90 ],
+            projection_type = 'natural earth'
+        )
+    )
+
+# Asia Map
+fig_asia = go.Figure()
+
+fig_asia.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_cases['Country'],
+        text = df_cases.iloc[:,-1],
+        marker = dict(
+            size = df_cases.iloc[:,-1]*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'red',
+            opacity = 0.7,
+            ),
+        name='total confirmed'
+        )
+    )
+
+fig_asia.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_recovered['Country'],
+        text = df_recovered.iloc[:,-1],
+        marker = dict(
+            size = df_recovered_size*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'green',
+            opacity = 0.7,
+            ),
+        name='total recovered'
+        )
+    )
+
+fig_asia.add_trace(go.Scattergeo(
+        locationmode = 'country names',
+        locations = df_deaths['Country'],
+        text = df_deaths.iloc[:,-1],
+        marker = dict(
+            size = df_deaths.iloc[:,-1]*1000/scale,
+            line_color='rgb(40,40,40)',
+            line_width=0.5,
+            sizemode = 'area',
+            color = 'yellow',
+            opacity = 0.7,
+            ),
+        name='total deceased'
+        )
+    )
+
+fig_asia.update_layout(
+        title = 'Asia',
+        showlegend = True,
+        legend_orientation="h",
+        legend=dict(x=0.25, y=0),
+        height = 400,
+        margin = {"r":0,"t":50,"l":0,"b":0},
+        geo = dict(
+            scope = 'asia',
+            landcolor = 'rgb(217, 217, 217)',
+            showcountries = True,
+            countrycolor = "white",
+            coastlinecolor = "white",
+            showframe = True,
+            #lonaxis_range= [ -150, None ],
+            #lataxis_range= [ -60, 90 ],
+            projection_type = 'natural earth'
+        )
+    )
+
 
 ### App Layout
 app.layout = html.Div([
     html.Div([
         html.H1("COVID-19 Live Analytics"),
-        dcc.Markdown("The main purpose of this dashboard is to provide a simple, interactive tool to visualize publicly available data about the COVID-19 pandemic. All graphs rely on data collected by the awesome team at [John Hopkins University CSSE](https://github.com/CSSEGISandData/COVID-19). Live counts above the graphs are relying on [NovelCovid APIs](https://github.com/NOVELCOVID/API) since they are updated more frequently.")
+        dcc.Markdown("**Current Status: Under Construction!** The main purpose of this dashboard is to provide a simple, interactive tool to visualize publicly available data about the COVID-19 pandemic. All graphs rely on data collected by the awesome team at [John Hopkins University CSSE](https://github.com/CSSEGISandData/COVID-19). Live counts above the graphs rely on [NovelCovid APIs](https://github.com/NOVELCOVID/API).")
     ], className = "row"),
     dcc.Tabs(
         id="tabs-with-classes",
@@ -73,12 +292,12 @@ app.layout = html.Div([
                 value='tab-3', className='custom-tab',
                 selected_className='custom-tab--selected'
             ),
-            # dcc.Tab(
-            #     label='Projections',
-            #     value='tab-4',
-            #     className='custom-tab',
-            #     selected_className='custom-tab--selected'
-            # ),
+            dcc.Tab(
+                label='Models',
+                value='tab-4',
+                className='custom-tab',
+                selected_className='custom-tab--selected'
+            ),
             dcc.Tab(
                 label='Measures',
                 value='tab-5',
@@ -109,7 +328,7 @@ def generate_table(dataframe, max_rows=10):
     ])
 
 ### Callbacks
-# Callback Cards
+# Callback Dropdown - KPIs
 @app.callback(Output('card-cases', 'children'),
              [Input('my-dropdown', 'value')])
 def update_children(X):
@@ -125,15 +344,15 @@ def update_children(X):
 def update_children(X):
     return html.H3(str(f'{requests.get("https://corona.lmao.ninja/countries/"+str(X)).json()["deaths"] :,}'), className="card-title")
 
-
+# Callbacks Dropdown - Curves
 @app.callback(Output('graph-confirmed', 'figure'),
              [Input('my-dropdown', 'value')])
 def update_figure(X):
     fig = {
                                 'data': [
                                     dict(
-                                        x=df.columns[4:],
-                                        y=df[df['Country'] == i].sum()[4:],
+                                        x=df_cases.columns[1:],
+                                        y=df_cases[df_cases['Country'] == i].sum()[1:],
                                         mode='lines+markers',
                                         opacity=0.7,
                                         marker={
@@ -149,9 +368,10 @@ def update_figure(X):
                                 'layout': dict(
                                     xaxis={'type': 'lin'},
                                     yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                    margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                    margin={'l': 50, 'b': 100, 't': 0, 'r': 50},
                                     legend={'x': 1, 'y': 1},
                                     hovermode='closest',
+                                    #paper_bgcolor='lightgrey',
                                     # title="Trend of total confirmed cases"
                                 )
                             }
@@ -163,8 +383,8 @@ def update_figure(X):
     fig = {
                                 'data': [
                                     dict(
-                                        x=df1.columns[4:],
-                                        y=df1[df1['Country'] == i].sum()[4:],
+                                        x=df_deaths.columns[1:],
+                                        y=df_deaths[df_deaths['Country'] == i].sum()[1:],
                                         mode='lines+markers',
                                         opacity=0.7,
                                         marker={
@@ -181,8 +401,8 @@ def update_figure(X):
                                 ],
                                 'layout': dict(
                                     xaxis={'type': 'lin'},
-                                    yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                    margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                    yaxis={'type': 'lin', 'title': 'Total Deceased'},
+                                    margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                     legend={'x': 1, 'y': 1},
                                     hovermode='closest',
                                     # title="Trend of total confirmed cases"
@@ -196,8 +416,8 @@ def update_figure(X):
     fig={
                             'data': [
                                 dict(
-                                    x=df.columns[4:],
-                                    y=df[df['Country'] == i].sum()[4:].diff(),
+                                    x=df_cases.columns[1:],
+                                    y=df_cases[df_cases['Country'] == i].sum()[1:].diff(),
                                     type='bar',
                                     opacity=0.7,
                                     name=i
@@ -206,14 +426,13 @@ def update_figure(X):
                             'layout': dict(
                                 xaxis={},
                                 yaxis={'title': 'Daily New Cases'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
                                 # title="Trend of total confirmed cases"
                             )
                         }
     return fig
-
 
 # Callback tabs
 @app.callback(Output('tabs-content-classes', 'children'),
@@ -280,8 +499,8 @@ def render_content(tab):
                             figure={
                                 'data': [
                                     dict(
-                                        x=df.columns[4:],
-                                        y=df.sum()[4:],
+                                        x=df_cases.columns[1:],
+                                        y=df_cases.sum()[1:],
                                         mode='lines+markers',
                                         opacity=0.7,
                                         marker={
@@ -297,7 +516,7 @@ def render_content(tab):
                                 'layout': dict(
                                     xaxis={'type': 'lin'},
                                     yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                    margin={'l': 50, 'b': 100, 't': 0, 'r': 0},
+                                    margin={'l': 50, 'b': 100, 't': 0, 'r': 50},
                                     legend={'x': 1, 'y': 1},
                                     hovermode='closest',
                                     # title="Trend of total confirmed cases"
@@ -311,8 +530,8 @@ def render_content(tab):
                         figure={
                             'data': [
                                 dict(
-                                    x=df.columns[4:],
-                                    y=df.sum()[4:].diff(),
+                                    x=df_cases.columns[1:],
+                                    y=df_cases.sum()[1:].diff(),
                                     type='bar',
                                     opacity=0.7,
                                     name="World"
@@ -321,7 +540,7 @@ def render_content(tab):
                             'layout': dict(
                                 xaxis={},
                                 yaxis={'title': 'Daily New Cases'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
                                 # title="Trend of total confirmed cases"
@@ -335,8 +554,8 @@ def render_content(tab):
                         figure={
                             'data': [
                                 dict(
-                                    x=df1.columns[4:],
-                                    y=df1.sum()[4:],
+                                    x=df_deaths.columns[1:],
+                                    y=df_deaths.sum()[1:],
                                     mode='lines+markers',
                                     opacity=0.7,
                                     marker={
@@ -354,7 +573,7 @@ def render_content(tab):
                             'layout': dict(
                                 xaxis={},
                                 yaxis={'type': 'lin', 'title': 'Total Deceased'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
                                 # title="Trend of total confirmed cases"
@@ -423,8 +642,8 @@ def render_content(tab):
                         figure={
                             'data': [
                                 dict(
-                                    x=df.columns[4:],
-                                    y=df[df['Country'] == i].sum()[4:],
+                                    x=df_cases.columns[1:],
+                                    y=df_cases[df_cases['Country'] == i].sum()[1:],
                                     mode='lines+markers',
                                     opacity=0.7,
                                     marker={
@@ -440,9 +659,11 @@ def render_content(tab):
                             'layout': dict(
                                 xaxis={'type': 'lin'},
                                 yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                margin={'l': 50, 'b': 100, 't': 0, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
+                                #paper_bgcolor="rgb(245, 247, 249)",
+                                #plot_bgcolor="rgb(245, 247, 249)"
                                 # title="Trend of total confirmed cases"
                             )
                         }
@@ -456,8 +677,8 @@ def render_content(tab):
                         figure={
                             'data': [
                                 dict(
-                                    x=df.columns[4:],
-                                    y=df[df['Country'] == i].sum()[4:].diff(),
+                                    x=df_cases.columns[1:],
+                                    y=df_cases[df_cases['Country'] == i].sum()[1:].diff(),
                                     type='bar',
                                     opacity=0.7,
                                     name=i
@@ -466,7 +687,7 @@ def render_content(tab):
                             'layout': dict(
                                 xaxis={},
                                 yaxis={'title': 'Daily New Cases'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
                                 # title="Trend of total confirmed cases"
@@ -482,8 +703,8 @@ def render_content(tab):
                         figure={
                             'data': [
                                 dict(
-                                    x=df1.columns[4:],
-                                    y=df1[df1['Country'] == i].sum()[4:],
+                                    x=df_deaths.columns[1:],
+                                    y=df_deaths[df_deaths['Country'] == i].sum()[1:],
                                     mode='lines+markers',
                                     opacity=0.7,
                                     marker={
@@ -501,7 +722,7 @@ def render_content(tab):
                             'layout': dict(
                                 xaxis={},
                                 yaxis={'type': 'lin', 'title': 'Total Deceased'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 0},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
                                 # title="Trend of total confirmed cases"
@@ -520,7 +741,7 @@ def render_content(tab):
                             figure={
                                 'data': [
                                     dict(
-                                        y=df[df['Country'] == i].sum()[4:][df[df['Country'] == i].sum()[4:].gt(threshold)],
+                                        y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
                                         mode='lines',
                                         opacity=0.7,
                                         marker={
@@ -528,7 +749,7 @@ def render_content(tab):
                                             'line': {'width': 1},
                                         },
                                         name=i
-                                    ) for i in df["Country"].unique()
+                                    ) for i in df_cases["Country"].unique()
                                 ],
                                 'layout': dict(
                                     xaxis={'range':[0,120],'type': 'lin', 'title':'''Number of days since >100 cases'''},
@@ -547,7 +768,7 @@ def render_content(tab):
                             figure={
                                 'data': [
                                     dict(
-                                        y=df[df['Country'] == i].sum()[4:][df[df['Country'] == i].sum()[4:].gt(threshold)],
+                                        y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
                                         mode='lines+markers',
                                         opacity=0.7,
                                         marker={
@@ -573,7 +794,7 @@ def render_content(tab):
                             figure={
                                 'data': [
                                     dict(
-                                        y=df[df['Country'] == i].sum()[4:][df[df['Country'] == i].sum()[4:].gt(threshold)],
+                                        y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
                                         mode='lines+markers',
                                         opacity=0.7,
                                         marker={
@@ -596,8 +817,8 @@ def render_content(tab):
         ])
     elif tab == 'tab-4':
         return html.Div([
-            html.P('''Forecast/Projections by ML supported SEIR Model. Fit to currently available data (confirmed cases, active cases, measures, hospital capacity, ICU beds, ...). Goal: Visualize predictions and effects of different measures in a way that can be understood by everybody.''')
-            #generate_table(df1f["Lat", "Long"], axis=1))
+            html.P('''Simulations/Projections by ML supported SEIR Model. Fit to currently available data (confirmed cases, active cases, measures, hospital capacity, ICU beds, ...). Goal: Visualize projections and effects of different measures in a way that can be understood by everybody. Display uncertainty of input data and projections.''')
+            #generate_table(df_deathsf["Lat", "Long"], axis=1))
         ])
     elif tab == 'tab-5':
         return html.Div([
@@ -611,7 +832,7 @@ def render_content(tab):
             #             figure={
             #                 'data': [
             #                     dict(
-            #                         y=df[df['Country'] == i].sum()[4:][df[df['Country'] == i].sum()[4:].gt(threshold)],
+            #                         y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
             #                         mode='lines+markers',
             #                         opacity=0.7,
             #                         marker={
@@ -637,7 +858,7 @@ def render_content(tab):
             #             figure={
             #                 'data': [
             #                     dict(
-            #                         y=df[df['Country'] == i].sum()[4:][df[df['Country'] == i].sum()[4:].gt(threshold)],
+            #                         y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
             #                         mode='lines+markers',
             #                         opacity=0.7,
             #                         marker={
@@ -662,9 +883,18 @@ def render_content(tab):
         ])
     elif tab == 'tab-6':
         return html.Div([
-            dcc.Markdown('''Visualization of available data on maps (World, Europe, Germany, ...) to display local clusters and regional spread of the pandemic.'''),
-            #generate_table(df["Lat", "Long"], axis=1)),
-            #generate_table(df1.drop(["Lat", "Long"], axis=1))
+            #dcc.Markdown('''Visualization of available data on maps (World, Europe, Germany, ...) to display regional clusters and the spread of the pandemic.'''),
+            html.Div([
+                dcc.Graph(id='map-world', figure=fig_world),
+            ], className='row'),
+            html.Div([
+                dcc.Graph(id='map-europe', figure=fig_europe),
+            ], className='row'),
+            html.Div([
+                dcc.Graph(id='map-asia', figure=fig_asia),
+            ], className='row'),
+            #generate_table(df_cases["Lat", "Long"], axis=1)),
+            #generate_table(df_deaths.drop(["Lat", "Long"], axis=1))
         ])
 
 ### Run App
