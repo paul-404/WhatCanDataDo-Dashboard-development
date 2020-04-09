@@ -267,7 +267,6 @@ fig_asia.update_layout(
 app.layout = html.Div([
     html.Div([
         html.H1("COVID-19 Live Analytics"),
-        dcc.Markdown("**Current Status: Under Construction!** The main purpose of this dashboard is to provide a simple, interactive tool to visualize publicly available data about the COVID-19 pandemic. All graphs rely on data collected by the awesome team at [John Hopkins University CSSE](https://github.com/CSSEGISandData/COVID-19). Live counts above the graphs rely on [NovelCovid APIs](https://github.com/NOVELCOVID/API).")
     ], className = "row"),
     dcc.Tabs(
         id="tabs-with-classes",
@@ -293,11 +292,7 @@ app.layout = html.Div([
                 selected_className='custom-tab--selected'
             ),
             dcc.Tab(
-<<<<<<< HEAD
                 label='Models',
-=======
-                label='Projections',
->>>>>>> 0be1f4dcdded5bca3e37c13d5067f122b2ba1ec2
                 value='tab-4',
                 className='custom-tab',
                 selected_className='custom-tab--selected'
