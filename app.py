@@ -267,6 +267,7 @@ fig_asia.update_layout(
 app.layout = html.Div([
     html.Div([
         html.H1("COVID-19 Live Analytics"),
+        dcc.Markdown("**Current Status: Under Construction!** The main purpose of this dashboard is to provide a simple, interactive tool to visualize publicly available data about the COVID-19 pandemic. All graphs rely on data collected by the team at [John Hopkins University CSSE](https://github.com/CSSEGISandData/COVID-19). Live counts above the graphs rely on [NovelCovid APIs](https://github.com/NOVELCOVID/API). Note: All graphs and figures only visualize the number of reported cases and not the actual case numbers. In addition, the  quantity and type of conducted tests, case definitions and reporting protocols may vary strongly between regions (e.g. regions with low number of conducted tests may have much higher actual case numbers than shown here).")
     ], className = "row"),
     dcc.Tabs(
         id="tabs-with-classes",
