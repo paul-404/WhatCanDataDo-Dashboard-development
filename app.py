@@ -14,9 +14,9 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.config.suppress_callback_exceptions = True # suppress callback errors
 server = app.server
-app.title="COVID-19 Live Analytics"
+app.title="COVID-19 Live Dashboard"
 
-### Import Data from JHU CSSE & create country dataframe
+### Import Data from JHU CSSE & create new country dataframe
 # Import Data
 df_cases_jhu = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
 df_recovered_jhu = pd.read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
@@ -266,8 +266,8 @@ fig_asia.update_layout(
 ### App Layout
 app.layout = html.Div([
     html.Div([
-        html.H1("COVID-19 Live Analytics"),
-        dcc.Markdown("**Current Status: Under Construction!** The main purpose of this dashboard is to provide a simple, interactive tool to visualize publicly available data about the COVID-19 pandemic. All graphs rely on data collected by the team at [John Hopkins University CSSE](https://github.com/CSSEGISandData/COVID-19). Live counts above the graphs rely on [NovelCovid APIs](https://github.com/NOVELCOVID/API). Note: All graphs and figures only visualize the number of reported cases and not the actual case numbers. In addition, the  quantity and type of conducted tests, case definitions and reporting protocols may vary strongly between regions (e.g. regions with low number of conducted tests may have much higher actual case numbers than shown here).")
+        html.H1("COVID-19 Live Dashboard"),
+        dcc.Markdown("**Current Status: Under Construction!** Note: Graphs and figures only visualize the number of reported cases and not the actual number of cases. Testing, case definitions and reporting protocols varies between regions and strongly affects the number of reported cases.")
     ], className = "row"),
     dcc.Tabs(
         id="tabs-with-classes",
@@ -299,13 +299,13 @@ app.layout = html.Div([
                 selected_className='custom-tab--selected'
             ),
             dcc.Tab(
-                label='Measures',
+                label='Maps',
                 value='tab-5',
                 className='custom-tab',
                 selected_className='custom-tab--selected'
             ),
             dcc.Tab(
-                label='Maps',
+                label='About',
                 value='tab-6',
                 className='custom-tab',
                 selected_className='custom-tab--selected'
@@ -313,19 +313,6 @@ app.layout = html.Div([
         ]),
     html.Div(id='tabs-content-classes')
 ], className='ten columns offset-by-one')
-
-### Function to generate table
-def generate_table(dataframe, max_rows=10):
-    return html.Table([
-        html.Thead(
-            html.Tr([html.Th(col) for col in dataframe.columns])
-        ),
-        html.Tbody([
-            html.Tr([
-                html.Td(dataframe.iloc[i][col]) for col in dataframe.columns
-            ]) for i in range(min(len(dataframe), max_rows))
-        ])
-    ])
 
 ### Callbacks
 # Callback Dropdown - KPIs
@@ -368,9 +355,10 @@ def update_figure(X):
                                 'layout': dict(
                                     xaxis={'type': 'lin'},
                                     yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                    margin={'l': 50, 'b': 100, 't': 0, 'r': 50},
+                                    margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                     legend={'x': 1, 'y': 1},
                                     hovermode='closest',
+                                    title = 'Total Confirmed Cases in ' + str(X),
                                     #paper_bgcolor='lightgrey',
                                     # title="Trend of total confirmed cases"
                                 )
@@ -405,6 +393,7 @@ def update_figure(X):
                                     margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                     legend={'x': 1, 'y': 1},
                                     hovermode='closest',
+                                    title = 'Total Deceased in ' + str(X),
                                     # title="Trend of total confirmed cases"
                                 )
                             }
@@ -420,6 +409,10 @@ def update_figure(X):
                                     y=df_cases[df_cases['Country'] == i].sum()[1:].diff(),
                                     type='bar',
                                     opacity=0.7,
+                                    marker={
+                                        'size': 7,
+                                        'line': {'width': 1},
+                                    },
                                     name=i
                                 ) for i in [str(X)]
                             ],
@@ -429,6 +422,37 @@ def update_figure(X):
                                 margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
+                                title = 'Daily New Confirmed Cases in ' + str(X),
+                                # title="Trend of total confirmed cases"
+                            )
+                        }
+    return fig
+
+@app.callback(Output('graph-daily-deceased', 'figure'),
+             [Input('my-dropdown', 'value')])
+def update_figure(X):
+    fig={
+                            'data': [
+                                dict(
+                                    x=df_deaths.columns[1:],
+                                    y=df_deaths[df_deaths['Country'] == i].sum()[1:].diff(),
+                                    type='bar',
+                                    opacity=0.7,
+                                    marker={
+                                        'size': 7,
+                                        'line': {'width': 1},
+                                        'color':'orange'
+                                    },
+                                    name=i
+                                ) for i in [str(X)]
+                            ],
+                            'layout': dict(
+                                xaxis={},
+                                yaxis={'title': 'Daily New Deceased'},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
+                                legend={'x': 1, 'y': 1},
+                                hovermode='closest',
+                                title = 'Daily New Deceased in ' + str(X),
                                 # title="Trend of total confirmed cases"
                             )
                         }
@@ -516,9 +540,10 @@ def render_content(tab):
                                 'layout': dict(
                                     xaxis={'type': 'lin'},
                                     yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                    margin={'l': 50, 'b': 100, 't': 0, 'r': 50},
+                                    margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                     legend={'x': 1, 'y': 1},
                                     hovermode='closest',
+                                    title = 'Total Confirmed Cases'
                                     # title="Trend of total confirmed cases"
                                 )
                             }
@@ -534,6 +559,10 @@ def render_content(tab):
                                     y=df_cases.sum()[1:].diff(),
                                     type='bar',
                                     opacity=0.7,
+                                    marker={
+                                        'size': 7,
+                                        'line': {'width': 1},
+                                    },
                                     name="World"
                                 )
                             ],
@@ -543,6 +572,7 @@ def render_content(tab):
                                 margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
+                                title = 'Daily New Confirmed Cases'
                                 # title="Trend of total confirmed cases"
                             )
                         }
@@ -576,6 +606,37 @@ def render_content(tab):
                                 margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
                                 legend={'x': 1, 'y': 1},
                                 hovermode='closest',
+                                title = 'Total Deceased'
+                                # title="Trend of total confirmed cases"
+                            )
+                        }
+                    )
+                    ], className="row"),
+                    html.Div([
+                    dcc.Graph(
+                        id='graph-daily-deceased-world',
+                        figure={
+                            'data': [
+                                dict(
+                                    x=df_deaths.columns[1:],
+                                    y=df_deaths.sum()[1:].diff(),
+                                    type='bar',
+                                    opacity=0.7,
+                                    marker={
+                                        'size': 7,
+                                        'line': {'width': 1},
+                                        'color':'orange'
+                                    },
+                                    name="World"
+                                )
+                            ],
+                            'layout': dict(
+                                xaxis={},
+                                yaxis={'title': 'Daily New Deceased'},
+                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
+                                legend={'x': 1, 'y': 1},
+                                hovermode='closest',
+                                title = 'Daily New Deceased'
                                 # title="Trend of total confirmed cases"
                             )
                         }
@@ -637,98 +698,22 @@ def render_content(tab):
                 ], className="row"),
                 html.Div([
                     html.Div([
-                    dcc.Graph(
-                        id='graph-confirmed',
-                        figure={
-                            'data': [
-                                dict(
-                                    x=df_cases.columns[1:],
-                                    y=df_cases[df_cases['Country'] == i].sum()[1:],
-                                    mode='lines+markers',
-                                    opacity=0.7,
-                                    marker={
-                                        'size': 7,
-                                        'line': {'width': 1}
-                                    },
-                                    line={
-                                        'width': 5
-                                    },
-                                    name=i
-                                ) for i in ["Germany"]
-                            ],
-                            'layout': dict(
-                                xaxis={'type': 'lin'},
-                                yaxis={'type': 'lin', 'title': 'Total Confirmed Cases'},
-                                margin={'l': 50, 'b': 100, 't': 0, 'r': 50},
-                                legend={'x': 1, 'y': 1},
-                                hovermode='closest',
-                                #paper_bgcolor="rgb(245, 247, 249)",
-                                #plot_bgcolor="rgb(245, 247, 249)"
-                                # title="Trend of total confirmed cases"
-                            )
-                        }
-                    )
+                        dcc.Graph(id='graph-confirmed')
                     ], className="twelve columns")
                 ], className="row"),
                 html.Div([
                     html.Div([
-                    dcc.Graph(
-                        id='graph-daily',
-                        figure={
-                            'data': [
-                                dict(
-                                    x=df_cases.columns[1:],
-                                    y=df_cases[df_cases['Country'] == i].sum()[1:].diff(),
-                                    type='bar',
-                                    opacity=0.7,
-                                    name=i
-                                ) for i in ["Germany"]
-                            ],
-                            'layout': dict(
-                                xaxis={},
-                                yaxis={'title': 'Daily New Cases'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
-                                legend={'x': 1, 'y': 1},
-                                hovermode='closest',
-                                # title="Trend of total confirmed cases"
-                            )
-                        }
-                    )
+                        dcc.Graph(id='graph-daily')
                     ], className="twelve columns"),
                 ], className="row"),
                 html.Div([
                     html.Div([
-                    dcc.Graph(
-                        id='graph-deceased',
-                        figure={
-                            'data': [
-                                dict(
-                                    x=df_deaths.columns[1:],
-                                    y=df_deaths[df_deaths['Country'] == i].sum()[1:],
-                                    mode='lines+markers',
-                                    opacity=0.7,
-                                    marker={
-                                        'size': 7,
-                                        'line': {'width': 1},
-                                        'color':'orange'
-                                    },
-                                    line={
-                                        'width': 5,
-                                        'color':'orange'
-                                    },
-                                    name=i
-                                ) for i in ["Germany"]
-                            ],
-                            'layout': dict(
-                                xaxis={},
-                                yaxis={'type': 'lin', 'title': 'Total Deceased'},
-                                margin={'l': 50, 'b': 100, 't': 50, 'r': 50},
-                                legend={'x': 1, 'y': 1},
-                                hovermode='closest',
-                                # title="Trend of total confirmed cases"
-                            )
-                        }
-                    )
+                        dcc.Graph(id='graph-deceased')
+                    ], className="twelve columns"),
+                ], className="row"),
+                html.Div([
+                    html.Div([
+                        dcc.Graph(id='graph-daily-deceased')
                     ], className="twelve columns"),
                 ], className="row"),
         ])
@@ -817,85 +802,89 @@ def render_content(tab):
         ])
     elif tab == 'tab-4':
         return html.Div([
-            html.P('''Simulations/Projections by ML supported SEIR Model. Fit to currently available data (confirmed cases, active cases, measures, hospital capacity, ICU beds, ...). Goal: Visualize projections and effects of different measures in a way that can be understood by everybody. Display uncertainty of input data and projections.''')
-            #generate_table(df_deathsf["Lat", "Long"], axis=1))
+            html.P('''Simulations/Projections by ML supported SEIR Model. Fit to currently available data (confirmed cases, active cases, measures, hospital capacity, ICU beds, ...). Goal: Visualize projections and effects of different measures in a way that can be understood by everybody. Display uncertainty of input data and projections.'''),
+        # PRELIMINARY MEASURE EXAMPLE GRAPHS
+        #     html.Div([
+        #         html.Div([
+        #         dcc.Graph(
+        #             id='graph-trend-2',
+        #             figure={
+        #                 'data': [
+        #                     dict(
+        #                         y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
+        #                         mode='lines+markers',
+        #                         opacity=0.7,
+        #                         marker={
+        #                             'size': 5,
+        #                             'line': {'width': 1}
+        #                         },
+        #                         name=i
+        #                     ) for i in countries_nomask
+        #                 ],
+        #                 'layout': dict(
+        #                     xaxis={'range':[0,45],'type': 'lin', 'title':'''Number of days since >100 cases'''},
+        #                     yaxis={'range':[2,None], 'type': 'log', 'title': 'Total Confirmed Cases'},
+        #                     legend={'x': 1, 'y': 1},
+        #                     hovermode='closest',
+        #                     title="Countries without widespread public mask usage"
+        #                 )
+        #             }
+        #         )
+        #         ], className="six columns"),
+        #         html.Div([
+        #         dcc.Graph(
+        #             id='graph-trend-3',
+        #             figure={
+        #                 'data': [
+        #                     dict(
+        #                         y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
+        #                         mode='lines+markers',
+        #                         opacity=0.7,
+        #                         marker={
+        #                             'size': 5,
+        #                             'line': {'width': 1}
+        #                         },
+        #                         name=i
+        #                     ) for i in countries_mask
+        #                 ],
+        #                 'layout': dict(
+        #                     xaxis={'range':[0,45],'type': 'lin', 'title':'''Number of days since >100 cases'''},
+        #                     yaxis={'range':[2,None], 'type': 'log', 'title': 'Total Confirmed Cases'},
+        #                     legend={'x': 1, 'y': 1},
+        #                     hovermode='closest',
+        #                     title="Countries with widespread public mask usage"
+        #                 )
+        #             }
+        #         )
+        #         ], className="six columns")
+        #     ], className="row")
         ])
     elif tab == 'tab-5':
         return html.Div([
-            html.Div([
-                 dcc.Markdown('''Visualization of available data (total cases, critical cases, deaths, doubling times etc.) in combination with past actions (closing schools, closing borders, number of test, contact tracing, lockdown, social distancing, widespread public mask usage etc) to learn more about/display the effects of different actions. **Preliminary** example: Trends of countries with widespread public mask usage vs countries without widespread public mask usage.
-                 **Caution: Correlation does not imply causation!** The number of reported cases is strongly influenced by many different factors such as each countries case definition, testing capacity (number of tests, type of tests, who is being tested, ...), official reporting protocols etc. In addition, the effect of a specific measure is dependent on other measures which may or may not take place at the same time. Furthermore, different strains of 2019-n-Cov may react to certain measures differently.'''),
-            #     html.Div([
-            #         html.Div([
-            #         dcc.Graph(
-            #             id='graph-trend-2',
-            #             figure={
-            #                 'data': [
-            #                     dict(
-            #                         y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
-            #                         mode='lines+markers',
-            #                         opacity=0.7,
-            #                         marker={
-            #                             'size': 5,
-            #                             'line': {'width': 1}
-            #                         },
-            #                         name=i
-            #                     ) for i in countries_nomask
-            #                 ],
-            #                 'layout': dict(
-            #                     xaxis={'range':[0,45],'type': 'lin', 'title':'''Number of days since >100 cases'''},
-            #                     yaxis={'range':[2,None], 'type': 'log', 'title': 'Total Confirmed Cases'},
-            #                     legend={'x': 1, 'y': 1},
-            #                     hovermode='closest',
-            #                     title="Countries without widespread public mask usage"
-            #                 )
-            #             }
-            #         )
-            #         ], className="six columns"),
-            #         html.Div([
-            #         dcc.Graph(
-            #             id='graph-trend-3',
-            #             figure={
-            #                 'data': [
-            #                     dict(
-            #                         y=df_cases[df_cases['Country'] == i].sum()[1:][df_cases[df_cases['Country'] == i].sum()[1:].gt(threshold)],
-            #                         mode='lines+markers',
-            #                         opacity=0.7,
-            #                         marker={
-            #                             'size': 5,
-            #                             'line': {'width': 1}
-            #                         },
-            #                         name=i
-            #                     ) for i in countries_mask
-            #                 ],
-            #                 'layout': dict(
-            #                     xaxis={'range':[0,45],'type': 'lin', 'title':'''Number of days since >100 cases'''},
-            #                     yaxis={'range':[2,None], 'type': 'log', 'title': 'Total Confirmed Cases'},
-            #                     legend={'x': 1, 'y': 1},
-            #                     hovermode='closest',
-            #                     title="Countries with widespread public mask usage"
-            #                 )
-            #             }
-            #         )
-            #         ], className="six columns")
-            #     ], className="row")
-            ])
-        ])
+        #dcc.Markdown('''Visualization of available data on maps (World, Europe, Germany, ...) to display regional clusters and the spread of the pandemic.'''),
+        html.Div([
+            dcc.Graph(id='map-world', figure=fig_world),
+        ], className='row'),
+        html.Div([
+            dcc.Graph(id='map-europe', figure=fig_europe),
+        ], className='row'),
+        html.Div([
+            dcc.Graph(id='map-asia', figure=fig_asia),
+        ], className='row'),
+    ])
+
     elif tab == 'tab-6':
         return html.Div([
-            #dcc.Markdown('''Visualization of available data on maps (World, Europe, Germany, ...) to display regional clusters and the spread of the pandemic.'''),
             html.Div([
-                dcc.Graph(id='map-world', figure=fig_world),
-            ], className='row'),
-            html.Div([
-                dcc.Graph(id='map-europe', figure=fig_europe),
-            ], className='row'),
-            html.Div([
-                dcc.Graph(id='map-asia', figure=fig_asia),
-            ], className='row'),
-            #generate_table(df_cases["Lat", "Long"], axis=1)),
-            #generate_table(df_deaths.drop(["Lat", "Long"], axis=1))
+                 dcc.Markdown('''
+                * __Current Status: Under Construction!__ The main purpose of this dashboard is to provide a simple, interactive tool to visualize publicly available data about the COVID-19 pandemic.
+                * __Caution:__ Graphs and figures only display the number of reported cases and **not** the number of actual cases. In addition, the quantity and type of conducted tests, case definitions, reporting structures and protocols may vary between regions and strongly affect the reported numbers. (e.g. regions with low number of conducted tests may have much higher actual case numbers than shown here; some countries may detect and report cases later than others; some countries may focus on testing specific groups of people depending on age, profession, region, preexisting conditions; some countries may conduct a higher percentage of tests post-mortem than others).
+                * __Data Source:__ All graphs rely on data collected by the team at [John Hopkins University CSSE](https://github.com/CSSEGISandData/COVID-19). Live counts above the graphs rely on [NovelCovid APIs](https://github.com/NOVELCOVID/API). All Data is continuously updated and is subject to change and errors.
+                '''),
+
+            ])
         ])
+
 
 ### Run App
 if __name__ == '__main__':
